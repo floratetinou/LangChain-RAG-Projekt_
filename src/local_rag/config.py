@@ -16,7 +16,7 @@ class Settings:
     chunk_size: int = int(os.getenv("CHUNK_SIZE", "800"))
     chunk_overlap: int = int(os.getenv("CHUNK_OVERLAP", "120"))
     retriever_mode: str = os.getenv("RETRIEVER_MODE", "similarity")
-    retriever_k: int = int(os.getenv("RETRIEVER_K", "4"))
+    retriever_k: int = int(os.getenv("RETRIEVER_K", "8"))
     mmr_fetch_k: int = int(os.getenv("MMR_FETCH_K", "12"))
     score_threshold: float = float(os.getenv("SCORE_THRESHOLD", "0.65"))
     retry_attempts: int = int(os.getenv("OLLAMA_RETRY_ATTEMPTS", "3"))

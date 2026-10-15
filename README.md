@@ -1,77 +1,164 @@
-# Solid Local LangChain RAG – Lernprojekt
+# Local LangChain RAG
 
-Dieses Repository ist ein **gemeinsam erweiterbares Lern-Template** für eine vollständig lokale RAG-Anwendung. Wir bauen es schrittweise aus, damit jede Stufe verständlich bleibt: Dokumente laden → strukturieren → in Chunks teilen → einbetten → in Chroma speichern → passende Chunks abrufen → Antwort mit Quellen erzeugen → über Gradio bedienen.
+Eine vollständig lokal ausgeführte Retrieval-Augmented-Generation-Anwendung mit **LangChain**, **Ollama**, **ChromaDB** und **Gradio**.
 
-> Status: **Grundgerüst / Lern-Template**. Die Architektur, Schnittstellen, Konfiguration, Beispielinhalte und Tests sind vorbereitet. Einige Stellen sind bewusst mit `TODO` markiert, damit wir sie gemeinsam implementieren und verstehen können.
+Das Projekt verarbeitet PDF-, TXT- und Markdown-Dokumente, zerlegt sie strukturiert in Chunks, erzeugt lokale Embeddings, speichert diese persistent in ChromaDB und beantwortet Fragen mithilfe eines lokalen Sprachmodells. Die Antworten enthalten nachvollziehbare Quellenangaben. Zusätzlich bietet die Gradio-Oberfläche Funktionen zur Dokumentverwaltung, Index-Neuerstellung und Anzeige der Retrieval-Ergebnisse.
 
-## Geplante Funktionen
 
-- LangChain-basierte RAG-Pipeline
-- PDF-, TXT- und Markdown-Loader
-- `PyMuPDFLoader` mit Seitenmetadaten
-- `MarkdownHeaderTextSplitter`
-- `RecursiveCharacterTextSplitter` mit Chunk Overlap
+---
+
+## Funktionsumfang
+
+### Dokumentverarbeitung
+
+- PDF-Loader über `PyMuPDFLoader`
+- TXT- und Markdown-Loader
+- PDF-Seitenmetadaten
+- Metadaten für Dateiname, Dateityp und Quelle
+- Upload von PDF-Dokumenten über die Gradio-Oberfläche
+- technisches Beispieldokument für lokale Tests
+
+### Intelligentes Chunking
+
+- `MarkdownHeaderTextSplitter` für strukturierte Markdown-Inhalte
+- `RecursiveCharacterTextSplitter` für feinere Textabschnitte
+- konfigurierbare Chunk-Größe
+- konfigurierbarer Chunk Overlap
+- Übernahme der Dokument- und Abschnittsmetadaten
+
+### Lokale Embeddings und Vektordatenbank
+
 - lokale Embeddings über Ollama
-- persistente Chroma-Vektordatenbank
-- drei Retriever-Modi:
-  1. Similarity Search
-  2. MMR für Relevanz und Vielfalt
-  3. Similarity Score Threshold
-- lokales LLM über Ollama
-- Quellenangaben in Antworten
-- Retry-Mechanismus für Verbindungsfehler
-- Gradio-Weboberfläche
-- Beispieldokument und Tests
-- `.env.example`, `.gitignore` und `requirements.txt`
+- persistente ChromaDB-Vektordatenbank
+- konfigurierbare Collection
+- Aufbau und Wiederverwendung des Index
+- Löschen und Neuaufbauen des Index
+
+### Drei Retriever-Modi
+
+1. **Similarity Search**  
+   Liefert die semantisch ähnlichsten Chunks zur Benutzerfrage.
+
+2. **Maximum Marginal Relevance, MMR**  
+   Kombiniert Relevanz mit Vielfalt und reduziert redundante Ergebnisse.
+
+3. **Similarity Score Threshold**  
+   Liefert nur Ergebnisse, deren Relevanzwert den konfigurierten Mindestwert erreicht.
+
+### Lokale Antwortgenerierung
+
+- lokales LLM über `ChatOllama`
+- `ChatPromptTemplate` für kontextgebundene Antworten
+- Antworten ausschließlich auf Basis der gefundenen Dokumentabschnitte
+- Quellenangaben mit Dateiname, Markdown-Überschrift und PDF-Seite
+- verständliche Antwort, wenn kein ausreichend passender Kontext gefunden wurde
+
+### Transparenz und Robustheit
+
+- Anzeige der abgerufenen Chunks
+- Anzeige von Similarity Scores
+- Retry-Mechanismus bei vorübergehenden Ollama-Verbindungsfehlern
+- verständliche Fehlerbehandlung
+- detailliertes Logging
+- Unit- und Integrationstests
+
+### Benutzeroberfläche
+
+- lokale Gradio-Weboberfläche
+- Eingabefeld für Fragen
+- Auswahl des Retriever-Modus
+- Dokument-Upload
+- Index-Neuerstellung
+- Antwort- und Quellenanzeige
+- Anzeige der gefundenen Chunks und Retrieval-Werte
+
+---
 
 ## Architektur
 
 ```text
-Dokumente (.pdf/.txt/.md)
-        │
-        ▼
-Document Loader
-(PyMuPDFLoader / TextLoader)
-        │
-        ▼
-Dokumentspezifisches Splitting
-(MarkdownHeaderTextSplitter)
-        │
-        ▼
-Feineres Chunking
-(RecursiveCharacterTextSplitter + Overlap)
-        │
-        ▼
-OllamaEmbeddings ──► Chroma (persistent)
-                         │
-Frage ──────────────────┤
-                         ▼
-Retriever (Similarity / MMR / Threshold)
-                         │
-                         ▼
-Prompt + Kontext + Quellen
-                         │
-                         ▼
-ChatOllama ──► Antwort mit Quellen
-                         │
-                         ▼
-                    Gradio UI
+                         INGESTION
+
+PDF / TXT / Markdown / Gradio Upload
+                  │
+                  ▼
+          Document Loader
+   PyMuPDFLoader / TextLoader
+                  │
+                  ▼
+  MarkdownHeaderTextSplitter
+                  │
+                  ▼
+RecursiveCharacterTextSplitter
+        mit Chunk Overlap
+                  │
+                  ▼
+        Chunks + Metadaten
+                  │
+                  ▼
+       OllamaEmbeddings
+                  │
+                  ▼
+     ChromaDB Vector Store
+     persistent in chroma_db/
+
+                         RETRIEVAL
+
+          Benutzerfrage
+                  │
+                  ▼
+       Embedding der Frage
+                  │
+                  ▼
+             Retriever
+ Similarity / MMR / Score Threshold
+                  │
+                  ▼
+   Relevante Chunks + Scores
+
+                         GENERATION
+
+       Kontext + Benutzerfrage
+                  │
+                  ▼
+       ChatPromptTemplate
+                  │
+                  ▼
+          ChatOllama LLM
+                  │
+                  ▼
+      Antwort + Quellenangaben
+                  │
+                  ▼
+          Gradio Web UI
 ```
+
+---
 
 ## Projektstruktur
 
 ```text
-solid-langchain-rag-template/
+LangChain-RAG-Projekt/
 ├── app.py
 ├── ingest.py
 ├── requirements.txt
+├── pytest.ini
 ├── .env.example
 ├── .gitignore
 ├── README.md
+├── ROADMAP.md
+│
 ├── data/
-│   └── beispiel_wissensbasis.md
+│   ├── beispiel_wissensbasis.md
+│   ├── 01_doip_grundlagen.md
+│   ├── 02_ethernet_grundlagen.md
+│   ├── 03_datacapture_x2_handbuch.md
+│   ├── 04_testablauf.pdf
+│   └── README_TESTS.md
+│
 ├── chroma_db/
 │   └── .gitkeep
+│
 ├── src/
 │   └── local_rag/
 │       ├── __init__.py
@@ -84,145 +171,307 @@ solid-langchain-rag-template/
 │       ├── prompts.py
 │       ├── pipeline.py
 │       └── ui.py
+│
 └── tests/
     ├── test_loaders.py
-    └── test_splitter.py
+    ├── test_splitter.py
+    ├── test_retry.py
+    ├── test_vectorstore.py
+    └── test_vectorstore_integration.py
 ```
+
+Die genaue Liste der Test- und Beispieldateien kann sich während der Weiterentwicklung ändern.
+
+---
 
 ## Voraussetzungen
 
-- Python 3.11 oder 3.12 empfohlen
+- Python 3.11 oder 3.12
 - Git
-- Ollama lokal installiert und gestartet
-- ausreichend Speicher für die gewählten Modelle
+- lokal installiertes und gestartetes Ollama
+- ausreichend RAM und Speicherplatz für die verwendeten Modelle
 
-**Hinweis für Firmengeräte:** Vor Installation oder Nutzung von Ollama bitte interne Freigaben, Toolmanagement und Datenschutzvorgaben prüfen.
 
-## Installation
+---
 
-### 1. Projekt entpacken und öffnen
+## Installation auf Windows
 
-```bash
-cd solid-langchain-rag-template
+### 1. Repository klonen
+
+```powershell
+git clone <DEINE-REPOSITORY-URL>
+cd LangChain-RAG-Projekt
 ```
 
-### 2. Virtuelle Umgebung erstellen
-
-Windows PowerShell:
+### 2. Virtuelle Python-Umgebung erstellen
 
 ```powershell
 python -m venv .venv
+```
+
+### 3. Virtuelle Umgebung aktivieren
+
+```powershell
 .\.venv\Scripts\Activate.ps1
 ```
 
-Linux/macOS:
+Nach erfolgreicher Aktivierung erscheint `(.venv)` am Anfang der PowerShell-Zeile.
 
-```bash
-python -m venv .venv
-source .venv/bin/activate
+Falls PowerShell die Aktivierung blockiert:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
+.\.venv\Scripts\Activate.ps1
 ```
 
-### 3. Abhängigkeiten installieren
+### 4. pip aktualisieren
 
-```bash
+```powershell
 python -m pip install --upgrade pip
+```
+
+### 5. Abhängigkeiten installieren
+
+```powershell
 pip install -r requirements.txt
 ```
 
-### 4. Umgebungsdatei erstellen
-
-Windows PowerShell:
+### 6. Lokale Konfiguration erstellen
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-Linux/macOS:
+Die Datei `.env` darf nicht in Git eingecheckt werden.
+
+---
+
+## Installation auf Linux oder macOS
 
 ```bash
+git clone <DEINE-REPOSITORY-URL>
+cd LangChain-RAG-Projekt
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -r requirements.txt
 cp .env.example .env
 ```
 
-### 5. Ollama-Modelle laden
+---
 
-Die Modellnamen stehen in `.env`. Beispiel:
+## Ollama einrichten
+
+Die Modellnamen werden über `.env` konfiguriert. Mit der Beispielkonfiguration werden folgende Modelle benötigt:
 
 ```bash
 ollama pull nomic-embed-text
 ollama pull llama3.2
 ```
 
-Prüfen, ob Ollama erreichbar ist:
+Installierte Modelle prüfen:
 
 ```bash
 ollama list
 ```
 
-## Geplanter Ablauf
+Ollama muss aktiv sein, bevor Dokumente indexiert oder Fragen beantwortet werden.
 
-### Index aufbauen
+---
 
-```bash
+## Konfiguration
+
+Beispiel für `.env`:
+
+```env
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_EMBEDDING_MODEL=nomic-embed-text
+OLLAMA_LLM_MODEL=llama3.2
+
+DATA_DIR=./data
+CHROMA_DIR=./chroma_db
+CHROMA_COLLECTION=local_rag_documents
+
+CHUNK_SIZE=800
+CHUNK_OVERLAP=120
+
+RETRIEVER_MODE=similarity
+RETRIEVER_K=8
+MMR_FETCH_K=12
+SCORE_THRESHOLD=0.65
+
+OLLAMA_RETRY_ATTEMPTS=3
+
+GRADIO_HOST=127.0.0.1
+GRADIO_PORT=7860
+```
+
+### Wichtige Parameter
+
+- `CHUNK_SIZE`: maximale Größe eines Chunks
+- `CHUNK_OVERLAP`: wiederholter Textbereich zwischen benachbarten Chunks
+- `RETRIEVER_K`: Anzahl der zurückgegebenen Ergebnisse
+- `MMR_FETCH_K`: Anzahl der zuerst betrachteten MMR-Kandidaten
+- `SCORE_THRESHOLD`: Mindestwert für den Threshold-Retriever
+- `OLLAMA_RETRY_ATTEMPTS`: maximale Zahl der Verbindungsversuche
+
+---
+
+## Anwendung starten
+
+### 1. Dokumente vorbereiten
+
+Lege unterstützte Dokumente in `data/` ab:
+
+```text
+.pdf
+.txt
+.md
+```
+
+Alternativ können PDF-Dokumente über die Gradio-Oberfläche hochgeladen werden.
+
+### 2. Index aufbauen
+
+```powershell
 python ingest.py
 ```
 
-### Weboberfläche starten
+Beim Indexieren passiert Folgendes:
 
-```bash
+```text
+Dateien laden
+→ Metadaten ergänzen
+→ Text strukturieren
+→ Chunks erzeugen
+→ Embeddings berechnen
+→ Chunks und Vektoren in ChromaDB speichern
+```
+
+### 3. Webanwendung starten
+
+```powershell
 python app.py
 ```
 
-Danach wird die lokale Gradio-Adresse im Terminal angezeigt.
+Die Anwendung ist anschließend standardmäßig unter folgender lokalen Adresse erreichbar:
 
-### Tests starten
-
-```bash
-pytest -q
+```text
+http://127.0.0.1:7860
 ```
 
-## Retriever-Modi
+### 4. Beispielanfragen
 
-### `similarity`
-Liefert die Chunks mit der höchsten semantischen Ähnlichkeit zur Frage. Das ist der einfachste Ausgangspunkt.
+```text
+Was ist DoIP?
 
-### `mmr`
-MMR bedeutet Maximum Marginal Relevance. Der Modus versucht, gleichzeitig relevante und untereinander weniger redundante Chunks zu liefern.
+Welche Aufgabe hat Tester Present?
 
-### `threshold`
-Liefert nur Chunks, deren Ähnlichkeitswert den konfigurierten Mindestwert erreicht. Dadurch kann die Pipeline bei unpassenden Fragen bewusst ohne Kontext antworten.
+Wie funktioniert eine Dateiübertragung über UDS?
+
+Fasse die wichtigsten Inhalte des Testablaufs zusammen.
+```
+
+---
+
+## Tests ausführen
+
+Alle Tests starten:
+
+```powershell
+pytest -v
+```
+
+Nur einen bestimmten Test ausführen:
+
+```powershell
+pytest tests/test_splitter.py -v
+```
+
+Beispiele für geprüfte Bereiche:
+
+- Loader und Metadaten
+- Markdown- und rekursives Chunking
+- Retry-Verhalten
+- Vectorstore-Grundfunktionen
+- ChromaDB-Integration
+
+Bei Integrationstests muss Ollama verfügbar sein und das konfigurierte Embedding-Modell lokal vorliegen.
+
+---
 
 ## Metadaten und Quellen
 
-Jeder geladene Datensatz soll mindestens diese Metadaten tragen:
+Je nach Dokumenttyp werden unter anderem folgende Metadaten gespeichert:
 
-- `source`: Pfad der Quelldatei
-- `file_name`: Dateiname
-- `file_type`: `pdf`, `txt` oder `md`
-- `page`: PDF-Seite, sofern vorhanden
-- `header_1`, `header_2`, `header_3`: Markdown-Überschriften, sofern vorhanden
+```text
+source
+file_name
+file_type
+page
+header_1
+header_2
+header_3
+start_index
+```
 
-Die Antwort zeigt anschließend deduplizierte Quellen. Seitenwerte werden menschenfreundlich als Seite 1, 2, 3 usw. ausgegeben.
+Dadurch kann die Anwendung nicht nur eine Antwort generieren, sondern auch anzeigen, aus welcher Datei, PDF-Seite oder Markdown-Sektion die verwendete Information stammt.
 
-## Lernplan für unsere gemeinsame Umsetzung
+---
 
-1. **Loader vollständig verstehen und testen**
-2. **Markdown- und rekursives Chunking vergleichen**
-3. **Ollama Embeddings anbinden**
-4. **Chroma persistent aufbauen und erneut laden**
-5. **drei Retriever-Modi praktisch vergleichen**
-6. **RAG-Prompt und lokale Generierung implementieren**
-7. **Quellen sauber formatieren**
-8. **Retry und verständliche Fehlermeldungen ergänzen**
-9. **Gradio-Oberfläche fertigstellen**
-10. **Tests und GitHub-Dokumentation vervollständigen**
+## Bekannte Grenzen
 
-## Sicherheit und Datenschutz
+- Die Antwortqualität hängt von Dokumentqualität, Chunking, Embedding-Modell, Retriever-Konfiguration und lokalem LLM ab.
+- Eingescannte PDFs ohne extrahierbaren Text benötigen zusätzlich OCR.
+- Der aktuelle Stand verwendet keinen Reranker und keine hybride Suche.
+- ChromaDB und Ollama laufen lokal; es gibt aktuell keine Docker-Konfiguration.
+- Die Anwendung ist als lokales Lern-, Demonstrations- und Portfolio-Projekt ausgelegt, nicht als produktiver Mehrbenutzerdienst.
 
-- Keine vertraulichen Unternehmensdaten in ein öffentliches GitHub-Repository hochladen.
-- `data/`, `.env` und `chroma_db/` sind standardmäßig ignoriert; nur das öffentliche Beispieldokument wird gezielt aufgenommen.
-- Vor dem Einsatz auf Firmenhardware interne Vorgaben für Ollama, Modelle und Python-Pakete prüfen.
-- Auch bei lokaler Verarbeitung können Dokumente sensible Inhalte enthalten. Zugriffsrechte und Löschkonzept gehören später zur produktiven Lösung.
+---
 
-## Nächster gemeinsamer Schritt
+## Verwendete Technologien
 
-Wir beginnen mit `loaders.py`: Wir schauen uns die Ausgabe jedes Loaders und die erzeugten Metadaten an. Danach implementieren wir das Chunking nachvollziehbar und testen es am Beispieldokument.
+- Python
+- LangChain
+- LangChain Ollama Integration
+- LangChain Chroma Integration
+- Ollama
+- ChromaDB
+- Gradio
+- PyMuPDF
+- python-dotenv
+- Tenacity
+- Pytest
+
+---
+
+## Projektziel
+
+Das Projekt zeigt praxisnah, wie eine lokale RAG-Anwendung modular aufgebaut, getestet und nachvollziehbar betrieben werden kann. Der Schwerpunkt liegt auf einer verständlichen Trennung der Verantwortlichkeiten:
+
+```text
+Loader → Splitter → Embeddings → Vectorstore → Retriever → Prompt → LLM → UI
+```
+
+Dadurch können einzelne Komponenten unabhängig untersucht, getestet und später ausgetauscht oder erweitert werden.
+
+---
+
+## Mögliche spätere Erweiterungen
+
+Das aktuelle Projekt bleibt bewusst ohne Docker und kann in diesem Zustand abgeschlossen werden. Denkbare optionale Erweiterungen wären:
+
+- Conversational Memory
+- Streaming der Antworten
+- Metadatenfilter
+- Hybrid Search aus BM25 und Vektorsuche
+- Reranking
+- automatisierte RAG-Evaluation
+- Unterstützung gescannter PDFs über OCR
+- getrennte Collections für unterschiedliche Wissensbereiche
+
+---
+
+## Lizenz
+
+Dieses Projekt wurde zu Lern-, Demonstrations- und Portfoliozwecken erstellt. Vor einer Weitergabe oder produktiven Nutzung müssen die Lizenzen der verwendeten Modelle, Bibliotheken und Dokumente geprüft werden.
